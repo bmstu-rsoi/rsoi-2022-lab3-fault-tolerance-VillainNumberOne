@@ -16,6 +16,13 @@ import json
 
 
 @csrf_exempt
+def health(request):
+    if request.method == "GET":
+        return HttpResponse(status=status.HTTP_200_OK) 
+    return HttpResponse(status=status.HTTP_400_BAD_REQUEST) 
+    
+
+@csrf_exempt
 def libraries(request):
     if request.method == "GET":
         try:
