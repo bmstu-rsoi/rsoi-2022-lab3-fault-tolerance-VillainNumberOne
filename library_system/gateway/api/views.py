@@ -42,12 +42,14 @@ def libraries(request, library_uid=None):
                         libraries_data = api.services_requests.get_city_libraries(
                             city, page, size
                         )
+                        if libraries_data is None:
+                            return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                         return JsonResponse(
                             libraries_data, safe=False, status=status.HTTP_200_OK
                         )
                     except Exception as ex:
-                        print(ex)
-                        return HttpResponse(status=status.HTTP_404_NOT_FOUND)
+                        print(ex, flush=True)
+                        return HttpResponse(status=status.HTTP_418_IM_A_TEAPOT)
                 else:
                     return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
             except:
@@ -67,6 +69,8 @@ def libraries(request, library_uid=None):
                 librarybooks = api.services_requests.get_library_books(
                     library_uid, page, size, show_all
                 )
+                if librarybooks is None:
+                    return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 return JsonResponse(librarybooks, safe=False, status=status.HTTP_200_OK)
             except Exception as ex:
                 print(ex)
@@ -184,7 +188,10 @@ def rating(request):
         if "X_USER_NAME" in headers.keys():
             username = headers["X_USER_NAME"]
             try:
-                rating, error = api.services_requests.get_user_rating(username)
+                result = api.services_requests.get_user_rating(username)
+                if result is None:
+                    return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                rating, error = result
                 if error:
                     if error == 404:
                         return HttpResponse(status=status.HTTP_404_NOT_FOUND)

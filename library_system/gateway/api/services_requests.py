@@ -1,18 +1,60 @@
 import requests
 import json
 from datetime import datetime
+from api.simple_circuit import Circuit
 
 LIBRARY_SYSTEM = "http://librarysystem:8060"
 RATING_SYSTEM = "http://ratingsystem:8050"
 RESERVATION_SYSTEM = "http://reservationsystem:8070"
 
 
-def get_city_libraries(city, page=None, size=None):
-    data = {"city": city, "page": page, "size": size}
+def health(SYSTEM):
+    try:
+        status = requests.get(
+            f"{SYSTEM}/manage/health", timeout=1
+        ).status_code
+        if status != 200:
+            raise ConnectionError()
+    except Exception:
+        raise ConnectionError()
+
+
+def get_city_libraries_request(data):
+    health(LIBRARY_SYSTEM)
     response = requests.get(
         f"{LIBRARY_SYSTEM}/api/v1/libraries", data=json.dumps(data)
     ).text
     return json.loads(response)
+
+
+def get_city_libraries_fallback(*args, **kwargs):
+    return None
+
+
+get_city_libraries_circuit = Circuit(
+    get_city_libraries_request, get_city_libraries_fallback, threshold=2, expected_exception=ConnectionError)
+
+
+def get_city_libraries(city, page=None, size=None):
+    data = {"city": city, "page": page, "size": size}
+    response = get_city_libraries_circuit.call(data)
+    return response
+
+
+def get_library_books_request(data):
+    health(LIBRARY_SYSTEM)
+    response = requests.get(
+        f"{LIBRARY_SYSTEM}/api/v1/librarybooks", data=json.dumps(data)
+    ).text
+    return json.loads(response)
+
+
+def get_library_books_fallback(*args, **kwargs):
+    return None
+
+
+get_library_books_circuit = Circuit(
+    get_library_books_request, get_library_books_fallback, threshold=2, expected_exception=ConnectionError)
 
 
 def get_library_books(library_uid, page=None, size=None, show_all=None):
@@ -22,17 +64,17 @@ def get_library_books(library_uid, page=None, size=None, show_all=None):
         "size": size,
         "show_all": show_all,
     }
-    response = requests.get(
-        f"{LIBRARY_SYSTEM}/api/v1/librarybooks", data=json.dumps(data)
-    ).text
-    return json.loads(response)
+    response = get_library_books_circuit.call(data)
+    return response
 
 
 def get_user_reservations(username):
     reservations = json.loads(
-        requests.get(f"{RESERVATION_SYSTEM}/api/v1/reservations/{username}").text
+        requests.get(
+            f"{RESERVATION_SYSTEM}/api/v1/reservations/{username}").text
     )
-    libraries_list = [reservation["library_uid"] for reservation in reservations]
+    libraries_list = [reservation["library_uid"]
+                      for reservation in reservations]
     books_list = [reservation["book_uid"] for reservation in reservations]
 
     libraryes_info_data = {"libraries_list": libraries_list}
@@ -84,13 +126,25 @@ def get_user_reservations(username):
 
     return result
 
-def get_user_rating(username):
+def get_user_rating_request(username):
+    health(RATING_SYSTEM)
     response = requests.get(f"{RATING_SYSTEM}/api/v1/ratings/{username}")
     if response.status_code != 200:
         return None, response.status_code
     else:
         user_stars = json.loads(response.text)
         return user_stars, None
+
+def get_user_rating_fallback(*args, **kwargs):
+    return None
+
+get_user_rating_circuit = Circuit(
+    get_user_rating_request, get_user_rating_fallback, threshold=2, expected_exception=ConnectionError)
+
+def get_user_rating(username):
+    result = get_user_rating_circuit.call(username)
+    return result
+
 
 def make_reservation(username, book_uid, library_uid, till_date):
     # CHECKS ##################################
@@ -114,7 +168,8 @@ def make_reservation(username, book_uid, library_uid, till_date):
         return None, "Not available"
 
     user_rented = json.loads(
-        requests.get(f"{RESERVATION_SYSTEM}/api/v1/reservations/{username}/rented").text
+        requests.get(
+            f"{RESERVATION_SYSTEM}/api/v1/reservations/{username}/rented").text
     )
     user_stars = json.loads(
         requests.get(f"{RATING_SYSTEM}/api/v1/ratings/{username}").text
@@ -149,7 +204,8 @@ def make_reservation(username, book_uid, library_uid, till_date):
         "till_date": till_date.strftime("%Y-%m-%d"),
     }
 
-    available_count_data = {"book_uid": book_uid, "library_uid": library_uid, "mode": 0}
+    available_count_data = {"book_uid": book_uid,
+                            "library_uid": library_uid, "mode": 0}
     status_code = requests.post(
         f"{LIBRARY_SYSTEM}/api/v1/books/available",
         data=json.dumps(available_count_data),
@@ -221,14 +277,15 @@ def return_book(username, reservation_uid, condition, date):
     status = reservation_info['status']
 
     # Выполняется запрос в Library Service для увеличения счетчика доступных книг (поле available_count).
-    available_count_data = {"book_uid": book_uid, "library_uid": library_uid, "mode": 1}
+    available_count_data = {"book_uid": book_uid,
+                            "library_uid": library_uid, "mode": 1}
     status_code = requests.post(
         f"{LIBRARY_SYSTEM}/api/v1/books/available",
         data=json.dumps(available_count_data),
     ).status_code
     if status_code != 202:
         return None, "Unavailable to update available_count"
-    
+
     # Update book condition
     update_condition_data = {
         "book_uid": book_uid,
@@ -240,7 +297,7 @@ def return_book(username, reservation_uid, condition, date):
     )
     if update_condition_response.status_code != 202:
         return None, "Unavailable to update book condition"
-    
+
     conditions = json.loads(update_condition_response.text)
 
     stars = 0
@@ -251,7 +308,7 @@ def return_book(username, reservation_uid, condition, date):
         stars -= 10
     if conditions["new_condition"] != conditions["old_condition"]:
         stars -= 10
-    
+
     update_stars_data = {
         "mode": 1 if stars >= 0 else 0,
         "amount": abs(stars) if stars < 0 else 1
