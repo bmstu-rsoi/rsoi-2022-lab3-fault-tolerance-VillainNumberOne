@@ -85,7 +85,13 @@ def reservations(request):
         headers = utils.get_http_headers(request)
         if "X_USER_NAME" in headers.keys():
             username = headers["X_USER_NAME"]
-            reservations = api.services_requests.get_user_reservations(username)
+            try:
+                reservations = api.services_requests.get_user_reservations(username)
+            except Exception as ex:
+                print(ex, flush=True)
+                return HttpResponse(status=status.HTTP_418_IM_A_TEAPOT)
+            if reservations is None:
+                return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return JsonResponse(reservations, safe=False, status=status.HTTP_200_OK)
 
     elif request.method == "POST":
@@ -113,6 +119,8 @@ def reservations(request):
             result, error = api.services_requests.make_reservation(
                 username, book_uid, library_uid, till_date
             )
+            if error == 500:
+                return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as ex:
             print(ex)
             return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -34,7 +34,7 @@ class Circuit():
         self.threshold_counter = 0
 
     def call(self, *args, **kwargs):
-        result = None
+        result = 222
         
         if self.state == "closed":
             self.threshold_counter += 1
@@ -44,10 +44,10 @@ class Circuit():
             except Exception as ex:
                 if issubclass(type(ex), self.expected_exception):
                     if self.threshold_counter < self.threshold:
-                        self.call(*args, **kwargs)
+                        result = self.call(*args, **kwargs)
                     else:
                         self.open()
-                        result = self.fallback(*args, **kwargs)
+                        result = self.call(*args, **kwargs)
                 else:
                     raise ex
             else:
@@ -56,7 +56,7 @@ class Circuit():
         elif self.state == "open":
             if time.time() - self.t1 > self.delay:
                 self.half_open()
-                self.call(*args, **kwargs)
+                result = self.call(*args, **kwargs)
             else:
                 result = self.fallback(*args, **kwargs)
 
@@ -66,7 +66,7 @@ class Circuit():
             except Exception as ex:
                 if issubclass(type(ex), self.expected_exception):
                     self.open()
-                    result = self.fallback(*args, **kwargs)
+                    result = self.call(*args, **kwargs)
                 else:
                     raise ex
             else:
