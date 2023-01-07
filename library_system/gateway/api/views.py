@@ -43,7 +43,7 @@ def libraries(request, library_uid=None):
                             city, page, size
                         )
                         if libraries_data is None:
-                            return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                            return JsonResponse({"message": "Bonus Service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
                         return JsonResponse(
                             libraries_data, safe=False, status=status.HTTP_200_OK
                         )
@@ -70,7 +70,7 @@ def libraries(request, library_uid=None):
                     library_uid, page, size, show_all
                 )
                 if librarybooks is None:
-                    return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return JsonResponse({"message": "Bonus Service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
                 return JsonResponse(librarybooks, safe=False, status=status.HTTP_200_OK)
             except Exception as ex:
                 print(ex)
@@ -89,9 +89,9 @@ def reservations(request):
                 reservations = api.services_requests.get_user_reservations(username)
             except Exception as ex:
                 print(ex, flush=True)
-                return HttpResponse(status=status.HTTP_418_IM_A_TEAPOT)
+                return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
             if reservations is None:
-                return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return JsonResponse({"message": "Bonus Service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
             return JsonResponse(reservations, safe=False, status=status.HTTP_200_OK)
 
     elif request.method == "POST":
@@ -120,7 +120,7 @@ def reservations(request):
                 username, book_uid, library_uid, till_date
             )
             if error == 500:
-                return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return JsonResponse({"message": "Bonus Service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception as ex:
             print(ex)
             return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -198,7 +198,7 @@ def rating(request):
             try:
                 result = api.services_requests.get_user_rating(username)
                 if result is None:
-                    return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return JsonResponse({"message": "Bonus Service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
                 rating, error = result
                 if error:
                     if error == 404:
